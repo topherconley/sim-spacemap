@@ -7,7 +7,7 @@ masterDegree <- 11L ## minimum out-degree of master predictors
 indepX <- 20L ## number of independent X variables. 
 n <- 250L ## sample size
 randxy = FALSE
-tol <- 1e-3 ##convergence tolerance
+tol <- 1e-6 ##convergence tolerance
 
 ##get the template partial correlation matrix from space package example
 library(space) 
