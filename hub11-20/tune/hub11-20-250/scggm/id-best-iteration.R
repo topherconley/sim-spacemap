@@ -28,3 +28,21 @@ wmcv <- foreach(res = iter_res, .combine = 'cbind') %do% {
 top_tuneid <- sapply(1:100, function(i) wmcv[i,top_iter[i]])
 
 cv_selected <- data.frame(dataid = 1:100, top_iter, top_tuneid)
+
+#find best hold outs per data id
+get_best_holdout_files <- function(i, cv_selected) { 
+  ddir <- file.path(basedir,  
+                    paste0(sprintf("%02d", cv_selected$top_iter[i]), "-cv-xy-yy-scggm"), 
+                    paste0("d", sprintf("%03d", cv_selected$dataid[i])))
+  bestho <- list.files(path = ddir, pattern = paste0("scggm_cv_tuneid_", 
+                                                     sprintf("%03d",cv_selected$top_tuneid[i])), 
+                       full.names = TRUE)
+}
+
+set_top_cv_vote_path <- function(i, cv_selected) { 
+  ddir <- file.path(basedir,  
+                    paste0(sprintf("%02d", cv_selected$top_iter[i]), "-cv-xy-yy-scggm"), 
+                    paste0("d", sprintf("%03d", cv_selected$dataid[i])))
+  file.path(ddir, "scggm_top_cv_vote_object.rds")
+}
+
