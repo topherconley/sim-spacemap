@@ -67,9 +67,8 @@ cgpag <- set_edge_attr(graph = cgpag, name = "weight", value = pc)
 cgpag <- add_vertices(graph = cgpag, nv = S)
 xbg_index <- (R + 1):(R + S)
 
-
-#For each X hub (all 10) create a Erdos-Renyi random graph with 5 other x vertices that have no edges to y vertices.
-start <- 501
+#For each X hub create a Erdos-Renyi random graph with 5 other x vertices that have no edges to y vertices.
+start <- R + 1
 ostart <- start
 for (xhub in xhubs_index) { 
   id <- c(xhub, start:(start + 4))
@@ -79,6 +78,9 @@ for (xhub in xhubs_index) {
   start <- start + 5
 }
 
+xset1 <- c(xhubs_index, ostart:(start - 1))
+xset1g <- subgraph.edges(cgpag, E(cgpag)[xset1 %--% xset1])
+
 #For every 5 other background X's, create an Erdos-Reny random graph in the same fashion, but do not include an X hub. 
 for(xbs in seq(from = start, to = (R + S), by = 5)) {
   id <- xbs:(xbs + 4)
@@ -87,21 +89,14 @@ for(xbs in seq(from = start, to = (R + S), by = 5)) {
   cgpag <- add_edges(cgpag, edges = as.vector(t(get.edgelist(tmpg))))
 }
 
-xset1 <- c(xhubs_index, ostart:start)
-xset1g <- subgraph.edges(cgpag, E(cgpag)[xset1 %--% xset1])
-ecount(xset1g)
-
-
 xset2 <- start:(R + S)
 xset2g <- subgraph.edges(cgpag, E(cgpag)[xset2 %--% xset2])
-ecount(xset2g)
-
+#no overlap 
+stopifnot(length(intersect(xset1, xset2)) == 0)
 
 #generate weights among X--X edges (all positive)
 xset <- unique(c(xset1, xset2))
-
 pc <- runif(n =  ecount(xset1g) + ecount(xset2g), min = 0.5, max = 1)
-hist(pc)
 xset <- unique(c(xset1, xset2))
 cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = E(cgpag)[xset %--% xset], value = pc)
 
@@ -179,7 +174,6 @@ summary(apply(dat, 2, sd))
 
 kappa(sigma_xxyy)
 kappa(Precision)
-
 
 
 library("corpcor")
