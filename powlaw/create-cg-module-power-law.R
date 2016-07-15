@@ -1,6 +1,8 @@
 
 library(igraph)
 
+########################################################
+#Function to generate a power law module 
 gen_powlaw_module <- function(id, R, S, ntophubs, prop_xhubs, 
                               xbg_clusters = 5, prob_xbg_edge = 0.3) { 
   library(igraph)
@@ -88,6 +90,14 @@ gen_powlaw_module <- function(id, R, S, ntophubs, prop_xhubs,
        xsubbg = paste(id, xset2, sep = ":"))
 }
 
+
+########################################################
+#Create the network 
+
+#IMPORTANT!!
+#Use the laplacian or SPACE recipe for the covariance matrix creation. 
+gen_under_laplacian <- TRUE
+
 #number of nodes with the potential for an edge
 R <- 100
 #number of X nodes with no edge
@@ -95,7 +105,7 @@ S <- 40
 #reproducibility
 set.seed(26225)
 
-#generate 5 modules and stitch together information
+#generate 5 modules and stitch together node and attribute information
 plgmods <- lapply(1:5, gen_powlaw_module, R = 100, S = 40, ntophubs = 4, prop_xhubs = 0.5, 
                   xbg_clusters = 5, prob_xbg_edge = 0.3)
 gmods <- lapply(plgmods, function(x) x$mod)
@@ -119,7 +129,10 @@ V(cgpag)[name %in% id_groups[["xhubs"]]]
 unif_x2y = c(0.5, 0.8)
 xy_edges <- E(cgpag)[ V(cgpag)[type %in% "xhubs"] %--% V(cgpag)[type %in% c("yhubs", "ybg")]]
 wgts <- runif(n =  length(xy_edges), min = unif_x2y[1], max =  unif_x2y[2])
-#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
+#laplacian generation does not use negative weights currently
+if (!gen_under_laplacian)  { 
+  wgts <- ifelse(test = rbinom(n = length(xy_edges), size = 1, prob = 0.5), wgts, -1*wgts)
+}
 cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = xy_edges, value = wgts)
 cgpag <- set_edge_attr(graph = cgpag, name = "type", index = xy_edges, value = "xy")
 
@@ -127,7 +140,9 @@ cgpag <- set_edge_attr(graph = cgpag, name = "type", index = xy_edges, value = "
 unif_y2y = c(0.5, 0.8)
 yy_edges <- E(cgpag)[ V(cgpag)[type %in% c("yhubs", "ybg")] %--% V(cgpag)[type %in% c("yhubs", "ybg")]]
 wgts <- runif(n =  length(yy_edges), min = unif_y2y[1], max =  unif_y2y[2])
-#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
+if (!gen_under_laplacian) { 
+  wgts <- ifelse(test = rbinom(n = length(yy_edges), size = 1, prob = 0.5), wgts, -1*wgts)
+}
 cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = yy_edges, value = wgts)
 cgpag <- set_edge_attr(graph = cgpag, name = "type", index = yy_edges, value = "yy")
 
@@ -135,15 +150,12 @@ cgpag <- set_edge_attr(graph = cgpag, name = "type", index = yy_edges, value = "
 unif_x2x = c(0.5, 0.8)
 xx_edges <- E(cgpag)[ V(cgpag)[type %in% c("xhubs", "xbg")] %--% V(cgpag)[type %in% c("xhubs", "xbg")]]
 wgts <- runif(n =  length(xx_edges), min = unif_x2x[1], max =  unif_x2x[2])
-#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
 cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = xx_edges, value = wgts)
 cgpag <- set_edge_attr(graph = cgpag, name = "type", index = xx_edges, value = "xx")
 
 #assure that all edges have been accounted for with a weight
 stopifnot(ecount(cgpag) == sum(sapply(c(xx_edges, xy_edges, yy_edges), length)))
 edge_attr_names(cgpag)
-
-
 
 fit_power_law(x = degree(cgpag))
 
@@ -165,210 +177,208 @@ hist(edge_attr(graph = cgpag, name = "weight"))
 
 ################################################################################
 
-
-
-#Define the laplacian := Precision Matrix
-# It is positive semi-definite and can be converted to 
-# positive definite (See sCGGM paper simulation).
-#D <- diag(x = degree(cgpag))
-#precision_xxyy <- D - A
-precision_xxyy <- laplacian_matrix(graph = cgpag, normalized = TRUE, sparse = FALSE)
-#verify properties of laplacian
-library(matrixcalc)
-is.positive.definite(precision_xxyy)
-is.positive.semi.definite(precision_xxyy)
-is.symmetric.matrix(precision_xxyy)
-#Add small positive values to diagonal
-diag(precision_xxyy) <- diag(precision_xxyy) + 0.05
-stopifnot(is.positive.definite(precision_xxyy))
-#Define the X and Y index sets
-
-
 iy <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("yhubs", "ybg")])
 ix <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xhubs", "xbg")])
 ixhubs <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xhubs")])
 ixbg <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xbg")])
-#assure non-overlapping
-stopifnot(intersect(iy, ix) == integer(0))
-#Broken down by x and y blocks
-L_xy <- precision_xxyy[ix,iy]
-L_yy <- precision_xxyy[iy,iy]
-is.positive.definite(L_yy)
 
-#Validate the assumptions of the network topology
-tol <- 1e-6
-library(spacemap)
-#Y to Y
-nonZeroUpper(as.matrix(precision_xxyy)[iy,iy], tol)
-#All X  to Y
-nonZeroWhole(as.matrix(precision_xxyy)[ix,iy], tol)
-#X hubs to Y
-nonZeroWhole(as.matrix(precision_xxyy)[ixhubs,iy], tol)
-#X->Y edges with multiple hits
-sum(degree(cgpag)[xhubs_index])
-#no edges from X background to Y
-nonZeroWhole(as.matrix(precision_xxyy)[ixbg,iy], tol)
-
-
-#Convert precision_xxyy Matrix to Sigma Matrix
-sigma_xxyy <- chol2inv(chol(precision_xxyy))  
-stopifnot(is.positive.definite(sigma_xxyy))
-summary(diag(sigma_xxyy))
-#generate simulation
-library(mvtnorm)
-n <- 250
-dat <- rmvnorm(n = n, mean  = rep(0.0, ncol(sigma_xxyy)), sigma = sigma_xxyy)
-
-summary(apply(dat, 2, sd))
-
-kappa(sigma_xxyy)
-kappa(precision_xxyy)
-
-
-library("corpcor")
-parcor_xxyy2 <- cor2pcor(m = sigma_xxyy)
-#Spacemap way
-conc_xxyy <- solve(sigma_xxyy)
-colnames(parcor_xxyy) <- colnames(precision_xxyy)
-rownames(parcor_xxyy) <- rownames(precision_xxyy)
-kappa(conc_xxyy)
-summary(diag(conc_xxyy))
-parcor_xxyy <- conc2parcor(conc_xxyy)
-colnames(parcor_xxyy) <- colnames(precision_xxyy)
-rownames(parcor_xxyy) <- rownames(precision_xxyy)
-diag(parcor_xxyy) <- 1
-stopifnot(all.equal(parcor_xxyy, parcor_xxyy2))
-pc <- parcor_xxyy
-
-diag(pc) <-  0
-tol <- 1e-6
-nzpc <- abs(pc) > tol
-summary(pc[nzpc])
-hist(pc[nzpc], 20)
-summary(abs(pc[nzpc]))
-
-#1 to 1 precision_xxyy and Partial Correlation
-stopifnot(identical(abs(parcor_xxyy) > tol, abs(conc_xxyy) > tol))
-#1 to 1 precision_xxyy and Partial Correlation
-stopifnot(identical(abs(parcor_xxyy) > tol, abs(precision_xxyy) > tol))
-
-# #Method 1 (Precision Parameterization -> Cholesky Decomposition -> Backsolve  )
-# R <- chol(precision_xxyy)
-# Lqr <- qr(x = precision_xxyy)
-# 
-# rmvnorm_precision <- function(R) {
-#   z <- rnorm(n = nrow(R), mean = 0, sd = 1)
-#   v <- backsolve(r = R, x = z)
-# }
-# dat_precision <- t(replicate(n, rmvnorm_precision(R)))
-# dim(dat_precision)
-# 
-# summary(apply(dat_precision, 2, sd))
-# 
-# 
-
-
-
-#######Diagonal dominance(SPACE, Jasa, 2009, recipe)#########
-
-# tmp <- as.matrix(get.adjacency(graph = cgpag, type = "both", attr = "weight"))
-# is.symmetric.matrix(tmp)
-# is.positive.definite(tmp)
-
-# dd <- 1
-# tmp <- as.matrix(get.adjacency(graph = cgpag, type = "upper", attr = "weight"))
-# rs <- rowSums(abs(tmp))
-# rescale <- ifelse(rs == 0, 1, 1.4*rs)
-# #tmp <- t(t(tmp)/ (2*rescale))
-# tmp <- t(sapply(1:nrow(tmp), function(i) tmp[i,] / rescale[i]))
-# tmp[lower.tri(tmp)] <- tmp[upper.tri(tmp)]
-# A <- tmp
-# A <- ( tmp + t(tmp) )  / 2
-# diag(A) <- dd
-# is.symmetric.matrix(A)
-# tmp <- A
-# tmp[lower.tri(tmp, diag = T)] <- 0.0
-# #diagonally dominant
-# offdiag <- rowSums(abs(tmp)) 
-# #stopifnot(max(offdiag) < dd)
-# stopifnot(is.positive.definite(A))
-# #Ainv <- solve(A) 
-# #is.symmetric.matrix(Ainv) 
-# # FALSE
-# Ainv <- chol2inv(chol(A))
-# stopifnot(is.symmetric.matrix(Ainv))
-# kappa(A)
-# kappa(Ainv)
-# #numerical issue here
-# #NegSqrtDiagAinv <- diag(x = sqrt(1/diag(Ainv)))
-# #vsigma_xxyy <- NegSqrtDiagAinv %*% Ainv %*% NegSqrtDiagAinv
-# #is.positive.definite(vsigma_xxyy)
-# #FALSE 
-# 
-# #diagonal is all ones
-# U <- (R + S)
-# sigma_xxyy <- matrix(NA, U, U)
-# for(i in 1:U) for(j in 1:U) sigma_xxyy[i,j] <- (Ainv[i,j] / sqrt(Ainv[i,i]*Ainv[j,j]))
-# #all.equal(sigma_xxyy, vsigma_xxyy)
-# # [1] TRUE
-# stopifnot(all.equal(rep(1.0, R +S), diag(sigma_xxyy)))
-# stopifnot(is.positive.definite(sigma_xxyy))
-# #very stable condition number
-# kappa(sigma_xxyy)
-# 
-# 
-# # cor_xxyy <- cov2cor(sigma_xxyy)
-# # kappa(cor_xxyy)
-# # is.positive.definite(cor_xxyy)
-# 
-# #calculate partial correlations
-# library("corpcor")
-# parcor_xxyy2 <- cor2pcor(m = sigma_xxyy)
-# #Spacemap way
-# conc_xxyy <- solve(sigma_xxyy)
-# summary(diag(conc_xxyy))
-# parcor_xxyy <- conc2parcor(conc_xxyy)
-# diag(parcor_xxyy) <- 1
-# stopifnot(all.equal(parcor_xxyy, parcor_xxyy2))
-# pc <- parcor_xxyy
-# 
-# 
-# 
-# 
-# 
-# diag(pc) <-  0
-# nzpc <- abs(pc) > tol
-# summary(pc[nzpc])
-# hist(pc[nzpc], 20)
-# summary(abs(pc[nzpc]))
-# 
-# 
-# # #Define the X and Y index sets
-# iy <- setdiff(1:R, xhubs_index)
-# ix <- xset
-# 
-# #Validate the assumptions of the network topology
-# tol <- 1e-6
-# library(spacemap)
-# #Y to Y
-# nonZeroUpper(as.matrix(pc)[iy,iy], tol)
-# #All X  to Y
-# nonZeroWhole(as.matrix(pc)[ix,iy], tol)
-# #X hubs to Y
-# nonZeroWhole(as.matrix(pc)[xhubs_index,iy], tol)
-# #27 X->Y edges with multiple hits (330 - 313)
-# sum(degree(cgpag)[xhubs_index])
-# #no edges from X background to Y
-# nonZeroWhole(as.matrix(pc)[xbg_index,iy], tol)
-# trueParCor <- list(xy = L_xy, yy = L_yy)
-# 
-# 
-# 
-# library(mvtnorm)
-# dat <- rmvnorm(n = n, mean  = rep(0.0, ncol(sigma_xxyy)), sigma = sigma_xxyy)
-# 
-# 
-
+if (gen_under_laplacian) { 
+  
+  #Define the laplacian := Precision Matrix
+  # It is positive semi-definite and can be converted to 
+  # positive definite (See sCGGM paper simulation).
+  #D <- diag(x = degree(cgpag))
+  #precision_xxyy <- D - A
+  precision_xxyy <- laplacian_matrix(graph = cgpag, normalized = TRUE, sparse = FALSE)
+  #verify properties of laplacian
+  library(matrixcalc)
+  is.positive.definite(precision_xxyy)
+  is.positive.semi.definite(precision_xxyy)
+  is.symmetric.matrix(precision_xxyy)
+  #Add small positive values to diagonal
+  diag(precision_xxyy) <- diag(precision_xxyy) + 0.05
+  stopifnot(is.positive.definite(precision_xxyy))
+  #Define the X and Y index sets
+  
+  
+  
+  #assure non-overlapping
+  stopifnot(intersect(iy, ix) == integer(0))
+  #Broken down by x and y blocks
+  L_xy <- precision_xxyy[ix,iy]
+  L_yy <- precision_xxyy[iy,iy]
+  is.positive.definite(L_yy)
+  
+  #Validate the assumptions of the network topology
+  tol <- 1e-6
+  library(spacemap)
+  #Y to Y
+  nonZeroUpper(as.matrix(precision_xxyy)[iy,iy], tol)
+  #All X  to Y
+  nonZeroWhole(as.matrix(precision_xxyy)[ix,iy], tol)
+  #X hubs to Y
+  nonZeroWhole(as.matrix(precision_xxyy)[ixhubs,iy], tol)
+  #X->Y edges with multiple hits
+  sum(degree(cgpag)[ixhubs])
+  #no edges from X background to Y
+  nonZeroWhole(as.matrix(precision_xxyy)[ixbg,iy], tol)
+  
+  
+  #Convert precision_xxyy Matrix to Sigma Matrix
+  sigma_xxyy <- chol2inv(chol(precision_xxyy))  
+  stopifnot(is.positive.definite(sigma_xxyy))
+  summary(diag(sigma_xxyy))
+  #generate simulation
+  library(mvtnorm)
+  n <- 250
+  dat <- rmvnorm(n = n, mean  = rep(0.0, ncol(sigma_xxyy)), sigma = sigma_xxyy)
+  
+  summary(apply(dat, 2, sd))
+  
+  kappa(sigma_xxyy)
+  kappa(precision_xxyy)
+  
+  
+  library("corpcor")
+  parcor_xxyy <- cor2pcor(m = sigma_xxyy)
+  conc_xxyy <- solve(sigma_xxyy)
+  colnames(parcor_xxyy) <- colnames(precision_xxyy)
+  rownames(parcor_xxyy) <- rownames(precision_xxyy)
+  kappa(conc_xxyy)
+  summary(diag(conc_xxyy))
+#   #Buggy Spacemap way
+#   parcor_xxyy <- conc2parcor(conc_xxyy)
+#   colnames(parcor_xxyy) <- colnames(precision_xxyy)
+#   rownames(parcor_xxyy) <- rownames(precision_xxyy)
+#   diag(parcor_xxyy) <- 1
+#   stopifnot(all.equal(parcor_xxyy, parcor_xxyy2))
+#   pc <- parcor_xxyy
+  
+  diag(pc) <-  0
+  tol <- 1e-6
+  nzpc <- abs(pc) > tol
+  summary(pc[nzpc])
+  hist(pc[nzpc], 20)
+  summary(abs(pc[nzpc]))
+  
+  #1 to 1 precision_xxyy and Partial Correlation
+  #stopifnot(identical(abs(parcor_xxyy) > tol, abs(conc_xxyy) > tol))
+  #1 to 1 precision_xxyy and Partial Correlation
+  stopifnot(identical(abs(parcor_xxyy) > tol, abs(precision_xxyy) > tol))
+  
+  # #Method 1 (Precision Parameterization -> Cholesky Decomposition -> Backsolve  )
+  # R <- chol(precision_xxyy)
+  # Lqr <- qr(x = precision_xxyy)
+  # 
+  # rmvnorm_precision <- function(R) {
+  #   z <- rnorm(n = nrow(R), mean = 0, sd = 1)
+  #   v <- backsolve(r = R, x = z)
+  # }
+  # dat_precision <- t(replicate(n, rmvnorm_precision(R)))
+  # dim(dat_precision)
+  # 
+  # summary(apply(dat_precision, 2, sd))
+  # 
+  # 
+} else { 
+  
+  #######Diagonal dominance(SPACE, Jasa, 2009, recipe)#########
+  
+  # tmp <- as.matrix(get.adjacency(graph = cgpag, type = "both", attr = "weight"))
+  # is.symmetric.matrix(tmp)
+  # is.positive.definite(tmp)
+  
+  dd <- 1
+  tmp <- as.matrix(get.adjacency(graph = cgpag, type = "upper", attr = "weight"))
+  rs <- rowSums(abs(tmp))
+  rescale <- ifelse(rs == 0, 1, 6.4*rs)
+  #tmp <- t(t(tmp)/ (2*rescale))
+  tmp <- t(sapply(1:nrow(tmp), function(i) tmp[i,] / rescale[i]))
+  tmp[lower.tri(tmp)] <- tmp[upper.tri(tmp)]
+  A <- tmp
+  A <- ( tmp + t(tmp) )  / 2
+  diag(A) <- dd
+  is.symmetric.matrix(A)
+  tmp <- A
+  tmp[lower.tri(tmp, diag = T)] <- 0.0
+  #diagonally dominant
+  offdiag <- rowSums(abs(tmp)) 
+  stopifnot(max(offdiag) < dd)
+  stopifnot(is.positive.definite(A))
+  #Ainv <- solve(A) 
+  #is.symmetric.matrix(Ainv) 
+  # FALSE
+  Ainv <- chol2inv(chol(A))
+  stopifnot(is.symmetric.matrix(Ainv))
+  kappa(A)
+  kappa(Ainv)
+  #numerical issue here
+  #NegSqrtDiagAinv <- diag(x = sqrt(1/diag(Ainv)))
+  #vsigma_xxyy <- NegSqrtDiagAinv %*% Ainv %*% NegSqrtDiagAinv
+  #is.positive.definite(vsigma_xxyy)
+  #FALSE 
+  
+  #diagonal is all ones
+  U <- 5*(R + S)
+  sigma_xxyy <- matrix(NA, U, U)
+  for(i in 1:U) for(j in 1:U) sigma_xxyy[i,j] <- (Ainv[i,j] / sqrt(Ainv[i,i]*Ainv[j,j]))
+  #all.equal(sigma_xxyy, vsigma_xxyy)
+  # [1] TRUE
+  stopifnot(all.equal(rep(1.0, 5*(R +S)), diag(sigma_xxyy)))
+  stopifnot(is.positive.definite(sigma_xxyy))
+  #very stable condition number
+  kappa(sigma_xxyy)
+  
+  
+  # cor_xxyy <- cov2cor(sigma_xxyy)
+  # kappa(cor_xxyy)
+  # is.positive.definite(cor_xxyy)
+  
+  #calculate partial correlations
+  library("corpcor")
+  parcor_xxyy <- cor2pcor(m = sigma_xxyy)
+  conc_xxyy <- solve(sigma_xxyy)
+  summary(diag(conc_xxyy))
+#   #Buggy Spacemap way
+#   parcor_xxyy <- conc2parcor(conc_xxyy)
+#   diag(parcor_xxyy) <- 1
+#   stopifnot(all.equal(parcor_xxyy, parcor_xxyy2))
+  pc <- parcor_xxyy
+  
+  all.equal(abs(parcor_xxyy) > tol, abs(conc_xxyy) > tol)
+  all.equal(abs(parcor_xxyy2) > tol, abs(conc_xxyy) > tol)
+  
+  
+  
+  diag(pc) <-  0
+  nzpc <- abs(pc) > tol
+  summary(pc[nzpc])
+  hist(pc[nzpc], 20)
+  summary(abs(pc[nzpc]))
+  
+  
+  
+  #Validate the assumptions of the network topology
+  tol <- 1e-6
+  library(spacemap)
+  #Y to Y
+  nonZeroUpper(as.matrix(pc)[iy,iy], tol)
+  #All X  to Y
+  nonZeroWhole(as.matrix(pc)[ix,iy], tol)
+  #X hubs to Y
+  nonZeroWhole(as.matrix(pc)[ixhubs,iy], tol)
+  #27 X->Y edges with multiple hits (330 - 313)
+  sum(degree(cgpag)[ixhubs])
+  #no edges from X background to Y
+  nonZeroWhole(as.matrix(pc)[ixbg,iy], tol)
+  #trueParCor <- list(xy = L_xy, yy = L_yy)
+  
+  
+  
+  library(mvtnorm)
+  dat <- rmvnorm(n = n, mean  = rep(0.0, ncol(sigma_xxyy)), sigma = sigma_xxyy)
+  
+}
 
 #Other graphs to consider
 
