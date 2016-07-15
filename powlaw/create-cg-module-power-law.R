@@ -1,7 +1,8 @@
 
 library(igraph)
 
-gen_powlaw_module <- function(R, S, id) { 
+gen_powlaw_module <- function(id, R, S, ntophubs, prop_xhubs, 
+                              xbg_clusters = 5, prob_xbg_edge = 0.3) { 
   library(igraph)
   #out-degree of new vertices being attached
   out.seq <- pmax(1,rpois(n = R, lambda = 2.2)) #2.2
@@ -16,123 +17,139 @@ gen_powlaw_module <- function(R, S, id) {
   #summary(deg_pag)
   #boxplot(degree(pag))
   #Inspect the power law fit
-  plf <- power.law.fit(x = degree(pag))
+  plf <- power.law.fit(x = deg_pag)
   
   #Identify hubs for X and Y
   hub_pag <- hub.score(pag, scale = TRUE, weights=NULL, options = igraph.arpack.default)
   #plot(hub_pag$vector, deg_pag, pch = 19)
   #top hubs split in half among X and Y
-  tophubs_index <- sort(hub_pag$vector, index.return = TRUE, decreasing = TRUE)$ix[1:4]
-  xhubs_index <- sample(tophubs_index, size = ceiling(length(tophubs_index)/2))
+  tophubs_index <- sort(hub_pag$vector, index.return = TRUE, decreasing = TRUE)$ix[1:ntophubs]
+  xhubs_index <- sample(tophubs_index, size = ceiling(length(tophubs_index)*prop_xhubs))
   yhubs_index <- setdiff(tophubs_index, xhubs_index)
   #hist(degree(pag)[xhubs_index])
   #hist(degree(pag)[yhubs_index])
   
-  #How many x-x edges exist? 
-  #very few edges (14), out of the whole graph (1185) and the total X hub edges (341), okay to efffectively delete
+  #Identify the non-hub Y nodes
+  ybg_index <- setdiff(1:R, c(xhubs_index, yhubs_index))
+  
+  #How many x-x hub edges exist? 
+  #very few edges  ut of the whole graph  and the total X hub edges, okay to efffectively delete X--X hub edges
   xx_edges <- E(pag)[ xhubs_index %--% xhubs_index]
   #delete these edges from the graph as we are trying to create no geographic (genomic) correlation between true hubs
   cgpag <- delete_edges(pag, xx_edges)
-  #14 have been deleted
   #ecount(cgpag)
   #new degrees for X hubs
   #degree(cgpag, v = xhubs_index)
 
-  #Still remains a power-law with alpha  = 2.59 in the range expected for biological networks
+  #Still remains a power-law with 2 < alpha < 3 in the range expected for biological networks
   noxx_plf <- power.law.fit(x = degree(cgpag))
   #noxx_plf$alpha
   
-  #the graph  has no disconnected components among the original power-law distribution
+  #Assert the module has no disconnected components among the original power-law distribution
   stopifnot(count_components(cgpag) == 1)
   
-  #generate weights among X--Y and Y--Y edges 
-  wgts <- runif(n =  ecount(cgpag), min = 0.2, max =  1)
-  #wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
-  cgpag <- set_edge_attr(graph = cgpag, name = "weight", value = wgts)
-  
-  #ceb <- cluster_edge_betweenness(graph = cgpag, directed = FALSE)
-  #modularity(x = cgpag, membership = ceb$membership)
-  
-  #add additional 200 vertices that have some correlation structure wth each hub
+  #add additional X vertices of size @param<S> which will have some edges between them. 
   cgpag <- add_vertices(graph = cgpag, nv = S)
   xbg_index <- (R + 1):(R + S)
   
-  
-  #For each X hub create a Erdos-Renyi random graph with 5 other x vertices that have no edges to y vertices.
+  #Create X--X subgraphs of size @param<xbg_clusters> from an Erdos-Reny model, which has the potential to include an Xhub. 
   start <- R + 1
   ostart <- start
   for (xhub in xhubs_index) { 
-    xid <- c(xhub, start:(start + 4))
-    tmpg <- sample_gnp(n = 6, p  = 0.3)
+    xid <- c(xhub, start:(start + xbg_clusters - 1))
+    tmpg <- sample_gnp(n = length(xid), p  = prob_xbg_edge)
     tmpg <- set_vertex_attr(graph = tmpg, name = "name", value = xid)
     cgpag <- add_edges(cgpag, edges = as.vector(t(get.edgelist(tmpg))))
     start <- start + 5
   }
+  #set of X's in X clusters with potential connection to xhubs
+  xset1 <- ostart:(start - 1)
   
-  xset1 <- c(xhubs_index, ostart:(start - 1))
-  xset1g <- subgraph.edges(cgpag, E(cgpag)[xset1 %--% xset1])
-  
-  #For every 5 other background X's, create an Erdos-Reny random graph in the same fashion, but do not include an X hub. 
-  for(xbs in seq(from = start, to = (R + S), by = 5)) {
-    xid <- xbs:(xbs + 4)
-    tmpg <- sample_gnp(n = 5, p  = 0.3)
+  #Create X--X subgraphs of size @param<xbg_clusters> from an Erdos-Reny model but do not include an X hub. 
+  for(xbs in seq(from = start, to = (R + S), by = xbg_clusters)) {
+    xid <- xbs:(xbs + xbg_clusters - 1)
+    tmpg <- sample_gnp(n = length(xid), p  = prob_xbg_edge)
     tmpg <- set_vertex_attr(graph = tmpg, name = "name", value = xid)
     cgpag <- add_edges(cgpag, edges = as.vector(t(get.edgelist(tmpg))))
   }
-  
+  #set of X's in X clusters with no connection to xhubs
   xset2 <- start:(R + S)
-  xset2g <- subgraph.edges(cgpag, E(cgpag)[xset2 %--% xset2])
-  #no overlap 
-  stopifnot(length(intersect(xset1, xset2)) == 0)
-  
-  #generate weights among X--X edges (all positive)
-  xset <- unique(c(xset1, xset2))
-  wgts <- runif(n =  ecount(xset1g) + ecount(xset2g), min = 0.2, max = 1)
-  xset <- unique(c(xset1, xset2))
-  cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = E(cgpag)[xset %--% xset], value = wgts)
-  
-  #Label types for visualization
-  cgpag <- set_vertex_attr(cgpag, name = "type", index = xhubs_index, value = "xhub")
-  cgpag <- set_vertex_attr(cgpag, name = "type", index = yhubs_index, value = "yhub")
-  cgpag <- set_vertex_attr(cgpag, name = "type", index = xbg_index, value = "x")
-  ybg_index <- setdiff(1:R, c(xhubs_index, yhubs_index))
-  cgpag <- set_vertex_attr(cgpag, name = "type", index = ybg_index, value = "y")
   
   #unique vertex id
   #set_vertex_attr(cgpag, name = "name", index = V(cgpag), value = paste(id, V(cgpag), sep = ":"))
   V(cgpag)$name <- paste(id, V(cgpag), sep = ":")
-  cgpag <- set_vertex_attr(cgpag, name = "module_id", index = V(cgpag), value = id)
+  #cgpag <- set_vertex_attr(cgpag, name = "module_id", index = V(cgpag), value = id)
   list(mod = cgpag, 
-       xhubs_index = paste(id, xhubs_index, sep = ":"), 
-       yhubs_index = paste(id, yhubs_index, sep = ":"),
-       xbg_index  = paste(id, xbg_index, sep = ":"),
-       ybg_index = paste(id, ybg_index, sep = ":"))
+       xhubs = paste(id, xhubs_index, sep = ":"), 
+       yhubs = paste(id, yhubs_index, sep = ":"),
+       xbg  = paste(id, xbg_index, sep = ":"),
+       ybg = paste(id, ybg_index, sep = ":"), 
+       xsubhubs = paste(id, xset1, sep = ":"), 
+       xsubbg = paste(id, xset2, sep = ":"))
 }
-
 
 #number of nodes with the potential for an edge
 R <- 100
 #number of X nodes with no edge
 S <- 40
-
 #reproducibility
 set.seed(26225)
 
 #generate 5 modules and stitch together information
-plgmods <- lapply(1:5, function(id) gen_powlaw_module(R = R, S = S, id = id))
+plgmods <- lapply(1:5, gen_powlaw_module, R = 100, S = 40, ntophubs = 4, prop_xhubs = 0.5, 
+                  xbg_clusters = 5, prob_xbg_edge = 0.3)
 gmods <- lapply(plgmods, function(x) x$mod)
 cgpag <- do.call(what = union, args = gmods)
-xhubs_index <- Reduce('c', lapply(plgmods, function(x) x$xhubs_index))
-xbg_index <- Reduce('c', lapply(plgmods, function(x) x$xbg_index))
-yhubs_index <- Reduce('c', lapply(plgmods, function(x) x$yhubs_index))
-ybg_index <- Reduce('c', lapply(plgmods, function(x) x$ybg_index))
+
+#label vertex types
+vertex_groups <- c("xhubs", "yhubs", "xbg", "ybg") #, "xsubhubs", "xsubbg")
+names(vertex_groups) <- vertex_groups
+id_groups <- lapply(vertex_groups, function(x) Reduce('c',  sapply(plgmods, function(y) y[[x]])))
+for (i in seq_along(id_groups)) { 
+  cgpag <- set_vertex_attr(cgpag, name = "type", index = V(cgpag)[name %in% id_groups[[i]]], value =  names(id_groups)[i])
+}
+#vertex_attr_names(cgpag)
+
+V(cgpag)[type %in% "xsubbg"]
+V(cgpag)[type %in% vertex_groups[1]]
+V(cgpag)[name %in% id_groups[["xhubs"]]]
+#
+
+#generate weights among X--Y 
+unif_x2y = c(0.5, 0.8)
+xy_edges <- E(cgpag)[ V(cgpag)[type %in% "xhubs"] %--% V(cgpag)[type %in% c("yhubs", "ybg")]]
+wgts <- runif(n =  length(xy_edges), min = unif_x2y[1], max =  unif_x2y[2])
+#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = xy_edges, value = wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "type", index = xy_edges, value = "xy")
+
+#generate weights among Y--Y edges 
+unif_y2y = c(0.5, 0.8)
+yy_edges <- E(cgpag)[ V(cgpag)[type %in% c("yhubs", "ybg")] %--% V(cgpag)[type %in% c("yhubs", "ybg")]]
+wgts <- runif(n =  length(yy_edges), min = unif_y2y[1], max =  unif_y2y[2])
+#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = yy_edges, value = wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "type", index = yy_edges, value = "yy")
+
+#generate weights among X--X 
+unif_x2x = c(0.5, 0.8)
+xx_edges <- E(cgpag)[ V(cgpag)[type %in% c("xhubs", "xbg")] %--% V(cgpag)[type %in% c("xhubs", "xbg")]]
+wgts <- runif(n =  length(xx_edges), min = unif_x2x[1], max =  unif_x2x[2])
+#wgts <- ifelse(test = rbinom(n = ecount(cgpag), size = 1, prob = 0.5), wgts, -1*wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "weight", index = xx_edges, value = wgts)
+cgpag <- set_edge_attr(graph = cgpag, name = "type", index = xx_edges, value = "xx")
+
+#assure that all edges have been accounted for with a weight
+stopifnot(ecount(cgpag) == sum(sapply(c(xx_edges, xy_edges, yy_edges), length)))
+edge_attr_names(cgpag)
+
+
 
 fit_power_law(x = degree(cgpag))
 
 
 #set_edge_attr(graph = cgpag, name = "")
 vertex_attr_names(cgpag)
-edge_attr_names(cgpag)
 
 #High modularity score
 ceb <- cluster_edge_betweenness(graph = cgpag, directed = FALSE)
@@ -154,43 +171,47 @@ hist(edge_attr(graph = cgpag, name = "weight"))
 # It is positive semi-definite and can be converted to 
 # positive definite (See sCGGM paper simulation).
 #D <- diag(x = degree(cgpag))
-#Precision <- D - A
-Precision <- laplacian_matrix(graph = cgpag, normalized = TRUE, sparse = FALSE)
+#precision_xxyy <- D - A
+precision_xxyy <- laplacian_matrix(graph = cgpag, normalized = TRUE, sparse = FALSE)
 #verify properties of laplacian
 library(matrixcalc)
-is.positive.definite(Precision)
-is.positive.semi.definite(Precision)
-is.symmetric.matrix(Precision)
+is.positive.definite(precision_xxyy)
+is.positive.semi.definite(precision_xxyy)
+is.symmetric.matrix(precision_xxyy)
 #Add small positive values to diagonal
-diag(Precision) <- diag(Precision) + 0.2
-stopifnot(is.positive.definite(Precision))
+diag(precision_xxyy) <- diag(precision_xxyy) + 0.05
+stopifnot(is.positive.definite(precision_xxyy))
 #Define the X and Y index sets
-iy <- setdiff(1:R, xhubs_index)
-ix <- xset
+
+
+iy <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("yhubs", "ybg")])
+ix <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xhubs", "xbg")])
+ixhubs <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xhubs")])
+ixbg <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xbg")])
 #assure non-overlapping
 stopifnot(intersect(iy, ix) == integer(0))
 #Broken down by x and y blocks
-L_xy <- Precision[ix,iy]
-L_yy <- Precision[iy,iy]
+L_xy <- precision_xxyy[ix,iy]
+L_yy <- precision_xxyy[iy,iy]
 is.positive.definite(L_yy)
 
 #Validate the assumptions of the network topology
 tol <- 1e-6
 library(spacemap)
 #Y to Y
-nonZeroUpper(as.matrix(Precision)[iy,iy], tol)
+nonZeroUpper(as.matrix(precision_xxyy)[iy,iy], tol)
 #All X  to Y
-nonZeroWhole(as.matrix(Precision)[ix,iy], tol)
+nonZeroWhole(as.matrix(precision_xxyy)[ix,iy], tol)
 #X hubs to Y
-nonZeroWhole(as.matrix(Precision)[xhubs_index,iy], tol)
+nonZeroWhole(as.matrix(precision_xxyy)[ixhubs,iy], tol)
 #X->Y edges with multiple hits
 sum(degree(cgpag)[xhubs_index])
 #no edges from X background to Y
-nonZeroWhole(as.matrix(Precision)[xbg_index,iy], tol)
+nonZeroWhole(as.matrix(precision_xxyy)[ixbg,iy], tol)
 
 
-#Convert Precision Matrix to Sigma Matrix
-sigma_xxyy <- chol2inv(chol(Precision))  
+#Convert precision_xxyy Matrix to Sigma Matrix
+sigma_xxyy <- chol2inv(chol(precision_xxyy))  
 stopifnot(is.positive.definite(sigma_xxyy))
 summary(diag(sigma_xxyy))
 #generate simulation
@@ -201,15 +222,20 @@ dat <- rmvnorm(n = n, mean  = rep(0.0, ncol(sigma_xxyy)), sigma = sigma_xxyy)
 summary(apply(dat, 2, sd))
 
 kappa(sigma_xxyy)
-kappa(Precision)
+kappa(precision_xxyy)
 
 
 library("corpcor")
 parcor_xxyy2 <- cor2pcor(m = sigma_xxyy)
 #Spacemap way
 conc_xxyy <- solve(sigma_xxyy)
+colnames(parcor_xxyy) <- colnames(precision_xxyy)
+rownames(parcor_xxyy) <- rownames(precision_xxyy)
+kappa(conc_xxyy)
 summary(diag(conc_xxyy))
 parcor_xxyy <- conc2parcor(conc_xxyy)
+colnames(parcor_xxyy) <- colnames(precision_xxyy)
+rownames(parcor_xxyy) <- rownames(precision_xxyy)
 diag(parcor_xxyy) <- 1
 stopifnot(all.equal(parcor_xxyy, parcor_xxyy2))
 pc <- parcor_xxyy
@@ -221,12 +247,14 @@ summary(pc[nzpc])
 hist(pc[nzpc], 20)
 summary(abs(pc[nzpc]))
 
-#1 to 1 Precision and Partial Correlation
-identical(abs(parcor_xxyy) > tol, abs(conc_xxyy) > tol)
+#1 to 1 precision_xxyy and Partial Correlation
+stopifnot(identical(abs(parcor_xxyy) > tol, abs(conc_xxyy) > tol))
+#1 to 1 precision_xxyy and Partial Correlation
+stopifnot(identical(abs(parcor_xxyy) > tol, abs(precision_xxyy) > tol))
 
 # #Method 1 (Precision Parameterization -> Cholesky Decomposition -> Backsolve  )
-# R <- chol(Precision)
-# Lqr <- qr(x = Precision)
+# R <- chol(precision_xxyy)
+# Lqr <- qr(x = precision_xxyy)
 # 
 # rmvnorm_precision <- function(R) {
 #   z <- rnorm(n = nrow(R), mean = 0, sd = 1)
