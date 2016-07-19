@@ -71,7 +71,6 @@ modularity(x = cgpag, membership = ceb$membership)
 
 #cytoscape visualization
 write.graph(graph = cgpag, file = "~/tmp/cg-module-power-law.gml", format = "gml")
-write.graph(graph = induced.subgraph(cgpag, vids = 1:R), file = "~/tmp/no-xx-cg-power-law.gml", format = "gml")
 
 hist(edge_attr(graph = cgpag, name = "weight"))
 
@@ -214,7 +213,7 @@ if (gen_under_laplacian) {
 #generate simulation under covariance matrix
 datadir <- "~/scratch-data/sim-spacemap/powlaw/pl-mod-01/datasets/n250/"
 simdir <- "~/scratch-data/sim-spacemap/powlaw/pl-mod-01/"
-system(paste("mkdir -p ", datdir))
+system(paste("mkdir -p ", datadir))
 
 #set up the partition
 n <- 250
