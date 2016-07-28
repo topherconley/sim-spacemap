@@ -186,7 +186,20 @@ if (gen_under_laplacian) {
   pc[!nzpc] <- 0.0 
   summary(pc[nzpc & ut])
   hist(pc[nzpc & ut], 20)
-  #boxplot(pc[nzpc & ut])
+  library(ggplot2)
+  library(scales)
+  qplot(x = pc[nzpc & ut]) + geom_histogram() + theme_bw() + 
+    scale_x_continuous(breaks = pretty_breaks(15)) + 
+    xlab("Partial Correlations")
+  ggsave("~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-partial-correlations-hist.png")
+  
+  #degree distribution 
+  xd <- degree(graph = cgpag, v= V(cgpag)[type %in% c("xhubs", "xbg")])
+  yd <- degree(graph = cgpag, v= V(cgpag)[type %in% c("yhubs", "ybg")])
+  dlab <- c(rep("X", length(xd)), rep("Y", length(yd)))
+  ggplot(data= data.frame(degree = c(xd,yd), type = dlab), aes(x = degree)) + 
+    facet_grid(type ~ . ) + geom_histogram() + theme_bw()
+  ggsave("~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-degree-hist.png")
   
   # Alternate Method for generating multivariate normal: 
   #(Precision Parameterization -> Cholesky Decomposition -> Backsolve  )

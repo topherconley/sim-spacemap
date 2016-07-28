@@ -53,7 +53,7 @@ summary(scv_xxyy$mcc)
 
 
 #######Potential
-all_files <- c(#"spacemap/spacemap_all_tuning_cv_vote_results.rds", 
+all_files <- c("spacemap/spacemap_all_tuning_cv_vote_results.rds", 
                "space/space_all_tuning_cv_vote_results.rds", 
                "scggm/scggm_all_tuning_cv_vote_results.rds")
 lall_voted <- lapply(all_files, readRDS)
@@ -84,35 +84,35 @@ mv <- as.data.frame(lvoted[[1]])
 spv <- as.data.frame(lvoted[[2]])
 scv <- as.data.frame(lvoted[[3]])
 
-# ordered_levels <- c("sCGGM.CV.vote", "sCGGM.All","Spacemap.All", "Spacemap.CV.vote")
-# mv$method <- factor(x = "Spacemap.CV.vote", levels = ordered_levels)
-# scv$method <- factor(x = "sCGGM.CV.vote", levels = ordered_levels)
-# lall_voted <- lapply(lall_voted, as.data.frame)
-# lall_voted[[1]]$method <- factor(x = "Spacemap.All", levels = ordered_levels)
-# lall_voted[[3]]$method <- factor(x = "sCGGM.All", levels = ordered_levels)
-# #Spacemap vs. sCGGM
-# cmp <- rbindlist(lall_voted[c(1,3)])
-# fig1 <- powerVfdr(res = cmp, powerZoom = c(0.50,1), fdrZoom = c(0.0,0.4), pal = "Paired")  +
-#   geom_point(data = scv, size = 2) +  
-#   geom_point(data = mv, size = 2) 
-# ggsave(filename = "~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-power-vs-fdr-spmapVscggm.png", 
-#        plot = fig1)
-# 
-# 
-# 
-# ordered_levels <- c("SPACE.CV.vote", "SPACE.All","Spacemap.All", "Spacemap.CV.vote")
-# mv$method <- factor(x = "Spacemap.CV.vote", levels = ordered_levels)
-# spv$method <- factor(x = "SPACE.CV.vote", levels = ordered_levels)
-# lall_voted <- lapply(lall_voted, as.data.frame)
-# lall_voted[[1]]$method <- factor(x = "Spacemap.All", levels = ordered_levels)
-# lall_voted[[2]]$method <- factor(x = "SPACE.All", levels = ordered_levels)
-# #Spacemap vs. SPACE
-# cmp <- as.data.frame(rbindlist(lall_voted[c(1,2)]))
-# fig2 <- powerVfdr(res = cmp, powerZoom = c(0.35,1), fdrZoom = c(0.0,0.4), pal = "Paired")  +
-#   geom_point(data = spv, size = 2) +  
-#   geom_point(data = mv, size = 2)  
-# ggsave(filename = "~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-power-vs-fdr-spmapVspace.png", 
-#        plot = fig2)
+ordered_levels <- c("sCGGM.CV.vote", "sCGGM.All","Spacemap.All", "Spacemap.CV.vote")
+mv$method <- factor(x = "Spacemap.CV.vote", levels = ordered_levels)
+scv$method <- factor(x = "sCGGM.CV.vote", levels = ordered_levels)
+lall_voted <- lapply(lall_voted, as.data.frame)
+lall_voted[[1]]$method <- factor(x = "Spacemap.All", levels = ordered_levels)
+lall_voted[[3]]$method <- factor(x = "sCGGM.All", levels = ordered_levels)
+#Spacemap vs. sCGGM
+cmp <- rbindlist(lall_voted[c(1,3)])
+fig1 <- powerVfdr(res = cmp, powerZoom = c(0.0,1), fdrZoom = c(0.0,1), pal = "Paired")  +
+  geom_point(data = scv, size = 2) +  
+  geom_point(data = mv, size = 2) 
+ggsave(filename = "~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-power-vs-fdr-spmapVscggm.png", 
+       plot = fig1)
+
+
+
+ordered_levels <- c("SPACE.CV.vote", "SPACE.All","Spacemap.All", "Spacemap.CV.vote")
+mv$method <- factor(x = "Spacemap.CV.vote", levels = ordered_levels)
+spv$method <- factor(x = "SPACE.CV.vote", levels = ordered_levels)
+lall_voted <- lapply(lall_voted, as.data.frame)
+lall_voted[[1]]$method <- factor(x = "Spacemap.All", levels = ordered_levels)
+lall_voted[[2]]$method <- factor(x = "SPACE.All", levels = ordered_levels)
+#Spacemap vs. SPACE
+cmp <- as.data.frame(rbindlist(lall_voted[c(1,2)]))
+fig2 <- powerVfdr(res = cmp, powerZoom = c(0.0,1), fdrZoom = c(0.0,1), pal = "Paired")  +
+  geom_point(data = spv, size = 2) +  
+  geom_point(data = mv, size = 2)  
+ggsave(filename = "~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-power-vs-fdr-spmapVspace.png", 
+       plot = fig2)
 
 #####SPACE vs sCGGM ############
 spv <- as.data.frame(lvoted[[2]])
@@ -123,14 +123,13 @@ spv$method <- factor(x = "SPACE.CV.vote", levels = ordered_levels)
 scv$method <- factor(x = "sCGGM.CV.vote", levels = ordered_levels)
 mv$method <- factor(x = "Spacemap.CV.vote", levels = ordered_levels)
 lall_voted <- lapply(lall_voted, as.data.frame)
-lall_voted[[1]]$method <- factor(x = "SPACE.All", levels = ordered_levels)
-lall_voted[[2]]$method <- factor(x = "sCGGM.All", levels = ordered_levels)
+lall_voted[[2]]$method <- factor(x = "SPACE.All", levels = ordered_levels)
+lall_voted[[3]]$method <- factor(x = "sCGGM.All", levels = ordered_levels)
 #Spacemap vs. sCGGM
-cmp <- rbindlist(lall_voted[c(1,2)])
-fig1 <- powerVfdr(res = cmp, powerZoom = c(-0.0001,1), fdrZoom = c(-0.00001,1), pal = "Paired")  +
+cmp <- rbindlist(lall_voted[c(2,3)])
+fig3 <- powerVfdr(res = cmp, powerZoom = c(-0.0001,1), fdrZoom = c(-0.00001,1), pal = "Paired")  +
   geom_point(data = scv, size = 2) +  
-  geom_point(data = spv, size = 2) +
-geom_point(data = mv, size = 2) 
+  geom_point(data = spv, size = 2) 
 ggsave(filename = "~/Dropbox/Chris_Conley/ms-spacemap/figures/pl-mod-01-power-vs-fdr-spaceVscggm.png", 
-       plot = fig1)
+       plot = fig3)
 
