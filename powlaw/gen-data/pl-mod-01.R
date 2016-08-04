@@ -82,7 +82,16 @@ ixbg <- vertex_attr(cgpag, name = "name", index = V(cgpag)[type %in% c("xbg")])
 #assure non-overlapping
 stopifnot(intersect(iy, ix) == integer(0))
 
-
+#identify X confounders
+xhubtoall <- induced_subgraph(graph = cgpag, vids = unlist(ego(graph = cgpag, order = 5, nodes = V(cgpag)[type %in% c("xhubs")])))
+xhubtoxbg <- induced_subgraph(graph = xhubtoall, vids = V(xhubtoall)[type %in% c("xhubs", "xbg")])
+xhub_to_xbg_edges <- E(xhubtoxbg)[ V(xhubtoxbg)[type %in% c("xhubs")] %--% V(xhubtoxbg)[type %in% c("xbg")]]
+# xhub_to_xbg_edges <- E(cgpag)[ V(cgpag)[type %in% c("xhubs")] %--% V(cgpag)[type %in% c("xbg")]]
+# xhub_to_xbg_edges
+# ecount(xhubtoxbg)
+# xhub_to_xbg_edges
+# V(xhubtoxbg)$type
+# plot(xhubtoxbg)
 ###############################################################
 #Create the positive defininte Covariance/Precision matrices 
 #and the Partial Correlation Matrix
