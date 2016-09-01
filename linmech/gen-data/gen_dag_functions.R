@@ -27,12 +27,36 @@ result<-matrix(0,p,p)
 
 }
 
-
+#Author: Chris Conley
+dag_xy_xhub <- function(px, py, nxhub = 20, min_hub_size = 5, mean_hub_size = 12) { 
+  
+  #construct x hubs with y targets ( x->y )
+  index_xhubs <- sample(px, nxhub)
+  xy_pool <- expand.grid(x = index_xhubs, y = seq_len(py))
+  hub_size_pool <- pmax(rpois(1000, mean_hub_size),min_hub_size)
+  #hist(hub_size_pool)
+  y_pool <- seq_len(py)
+  samp_y_edges <- function(x) { 
+    
+  }
+  
+  xy_edges <- list()
+  for(i in seq_along(index_xhubs)) { 
+    y_hits <- sample(x = y_pool, size = sample(hub_size_pool,1))
+    xy_edges[[i]] <- y_hits
+    y_still_in_pool <- as.logical(rbinom(n = length(y_hits), size = 1, prob = 0.05))
+    y_pool <- setdiff(y_pool, y_hits[y_still_in_pool])
+  }
+  
+  x2y_adj <- matrix(0,px,py)
+  for (i in seq_along(index_xhubs)) x2y_adj[index_xhubs[i],xy_edges[[i]]] <- 1
+  x2y_adj
+}
 
 
 ###############################
 #####  generate layer 1:  X->Y network: only relevant X and Y-nodes in Markov blanket of X  are remained in the adjacent matrix
-DAG_XY<-function(px=800,py=800,rel=NULL,pc=0.1,pt=0.1/py,pco=0.3/py){
+DAG_XY<-function(px=800,py=800,rel=NULL,pc=0.1,pt=0.1/py,pco=0.3/py, xhub = TRUE){
 ##pare: px -- number of X-nodes; py -- number of Y-nodes; 
 ##      rel -- 0-1 matrix (px by py) indicating cis, trans between X and Y nodes
 ##      pc -- chance of cis-regulation between X-Y cis pairs; pt -- chance of trans-regulation
@@ -47,7 +71,14 @@ DAG_XY<-function(px=800,py=800,rel=NULL,pc=0.1,pt=0.1/py,pco=0.3/py){
 
 Pare.prob<-matrix(0,px+py,px+py)
 
-temp<-pc*t(rel)+pt*(1-t(rel))              ##X->Y prob.
+##X->Y prob.
+if (xhub) { 
+  temp <- t(rel)
+} else { 
+  temp<-pc*t(rel)+pt*(1-t(rel))              
+}
+
+
 Pare.prob[(px+1):(px+py),1:px]<-temp
 
 temp<-matrix(pco,py,py)                ##Y-->Y prob.

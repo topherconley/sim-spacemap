@@ -1,6 +1,6 @@
 #not found
 #source("~/repos/sim-spacemap/linmech/space_score_functions_10082011.txt")  ##space.shd, and space.shd.adj
-load("dense_p500_adj_matrix.Rdata")
+load("~/tmp/dense_p500_adj_matrix.Rdata")
 true.v=vstructures(true.dir)
 ############################# part II: generate Guassin linear mechanism based on pancr.adj 
 p=nrow(true.dir)

@@ -5,8 +5,15 @@ source("~/repos/sim-spacemap/linmech/gen-data/gen_dag_functions.R")
 ########## set parameters 
 px.ini<-250                     ## initial number of X nodes
 py.ini<-300                     ##initial  number of Y nodes 
-rel<-matrix(0,px.ini,py.ini)        ## px by py matrix indicating cis (1), trans (0) relationship
-diag(rel[,1:px.ini])<-1   ##set X, Y nodes with same indices as cis-pair
+
+xhub <- TRUE
+
+if (xhub) { 
+  rel <- dag_xy_xhub(px = px.ini, py = py.ini, nxhub = 10, min_hub_size = 5, mean_hub_size = 12)
+} else { 
+  rel<-matrix(0,px.ini,py.ini)        ## px by py matrix indicating cis (1), trans (0) relationship
+  diag(rel[,1:px.ini])<-1   ##set X, Y nodes with same indices as cis-pair
+}
 
 pc<-0.5                    ##chance of cis-regulation between cis-pairs
 pt<-0.5/py.ini                  ##chance of trans-regulation between trans-pairs
@@ -15,7 +22,7 @@ pco<-0.6/py.ini                 ##chance of being co-parent
 
 
 set.seed(100)
-result.xy<-DAG_XY(px.ini,py.ini,rel,pc,pt,pco)
+result.xy<-DAG_XY(px.ini,py.ini,rel,pc,pt,pco, xhub = xhub)
 adj.xy.we<-result.xy$adjacent         ## cis:1; trans :2 ; co-expression (Y-Y): 3
 
 index.x<-result.xy$X_index
@@ -108,8 +115,10 @@ sum(true.moral[upper.tri(true.moral)]  == 3)
 sum(true.moral[upper.tri(true.moral)]  == 2)
 sum(true.moral[upper.tri(true.moral)]  == 1)
 
+dim(true.moral)
 library(ggplot2)
 qplot(rowSums(true.moral))
 
 hist(colSums(true.moral))
 #save(true.dir,true.ske,file="dense_p500_adj_matrix.Rdata")
+save(true.dir,true.ske,file="~/tmp/dense_p500_adj_matrix.Rdata")
