@@ -5,29 +5,39 @@ library(data.table)
 min_score <- function(dt) dt[,list(score = min(cv_scggm)), by = dataid]
 library(foreach)
 
-iter_res <- foreach(i = 1:3) %do% { 
-  dir <- paste0("/home/cconley/scratch-data/sim-spacemap/hub11-20/2016/results/n250/scggm/", sprintf("%02d", i), "-cv-xy-yy-scggm")
+#
+did <- c(1:24, 26:29, 31:100)
+iters <- 1:2
+iter_res <- foreach(i = iters) %do% { 
+  dir <- paste0("~/scratch-data/sim-spacemap/powlaw/pl-mod-01/results/n250/scggm/", sprintf("%02d", i), "-cv-xy-yy-scggm")
   file <- "cv_score_scggm_summary.rds"
   readRDS(file.path(dir, file))
 }
-names(iter_res) <- paste0("iter_", 1:3)
+names(iter_res) <- paste0("iter_", iters)
 
 mcv <- foreach(res = iter_res, .combine = 'cbind') %do% { 
   res$min_cv_scores <- min_score(res$cv_scores)
   #make sure index matches up with ordered data id
-  stopifnot(identical(res$min_cv_scores$dataid, 1:100))
+  stopifnot(identical(res$min_cv_scores$dataid, did))
   res$min_cv_scores$score 
+}
+if(!is.matrix(mcv)) { 
+ mcv <- matrix(mcv, ncol = 1)
 }
 top_iter <- apply(mcv, 1, which.min)
 
 wmcv <- foreach(res = iter_res, .combine = 'cbind') %do% { 
   #make sure index matches up with ordered data id
-  stopifnot(identical(res$top$dataid, 1:100))
+  stopifnot(identical(res$top$dataid, did))
   res$top$best_id
 }
-top_tuneid <- sapply(1:100, function(i) wmcv[i,top_iter[i]])
+if(!is.matrix(wmcv)) { 
+ wmcv <- matrix(wmcv, ncol = 1)
+}
 
-cv_selected <- data.frame(dataid = 1:100, top_iter, top_tuneid)
+top_tuneid <- sapply(seq_along(did), function(i) wmcv[i,top_iter[i]])
+
+cv_selected <- data.frame(dataid = did, top_iter, top_tuneid)
 
 #find best hold outs per data id
 get_best_holdout_files <- function(i, cv_selected) { 

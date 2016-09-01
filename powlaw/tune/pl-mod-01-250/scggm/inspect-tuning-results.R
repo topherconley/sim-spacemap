@@ -19,3 +19,5 @@ tsc02 <- foreach(dataid = did) %do% {
                      lam2 = seq(top_lam2*.30, top_lam2*1.90, length  = 6))
 }
 names(tsc02) <- did
+
+sapply(1:2, function(i) unique(tsc02[[1]][,i]))

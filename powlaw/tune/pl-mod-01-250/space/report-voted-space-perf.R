@@ -19,7 +19,7 @@ library(data.table)
 voted <- rbindlist(voted_space_perf)
 setkey(voted, comparison)
 voted["(yy,xy)",]
-voted[,list(median_mcc = median(mcc), median_power = median(power), median_fdr = median(fdr)),by = comparison]
+voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
 voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
 saveRDS(voted, file = file.path(basedir, "space_top_cv_voting_performance.rds"))
 save.image(file = file.path(basedir, "space_top_cv_voting.rda"))

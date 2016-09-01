@@ -1,16 +1,17 @@
 
-basedir <- "/home/cconley/scratch-data/sim-spacemap/hub11-20/2016/results/n250/scggm"
+basedir <- "~/scratch-data/sim-spacemap/powlaw/pl-mod-01/results/n250/scggm/"
 
 #find best models : outputs the <cv_selected> object seen below. 
 source("id-best-iteration.R")
 #indexed by dataid
-best_holdout_files <- lapply(cv_selected$dataid, get_best_holdout_files, cv_selected = cv_selected)
-top_cv_files  <- lapply(cv_selected$dataid, set_top_cv_vote_path, cv_selected = cv_selected)
+best_holdout_files <- lapply(seq_along(did), get_best_holdout_files, cv_selected = cv_selected)
+top_cv_files  <- lapply(seq_along(did), set_top_cv_vote_path, cv_selected = cv_selected)
 
+library(spacemap)
 #each dataset has the same underlying truth
 dataid <- cv_selected$dataid[1]
-dat <- readRDS(paste0("~/scratch-data/sim-spacemap/hub11-20/2016/datasets/n250/hub11-20-250-dataid_", sprintf("%03d", dataid), ".rds"))
-truth <- dat$trueParCor
+mod <- readRDS("/home/cconley/scratch-data/sim-spacemap/powlaw/pl-mod-01/pl-mod-01-model.rds")
+truth <- list(xy = mod$model_sig_xy, yy = mod$model_sig_yy) 
 
 #calculate cv-vote
 library(foreach)
@@ -25,7 +26,7 @@ library(data.table)
 voted <- rbindlist(voted_scggm_perf)
 setkey(voted, comparison)
 voted["(yy,xy)",]
-voted[,list(median_mcc = median(mcc), median_power = median(power), median_fdr = median(fdr)),by = comparison]
+voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
 voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
 saveRDS(voted, file = file.path(basedir, "scggm_top_cv_voting_performance.rds"))
 save.image(file = file.path(basedir, "scggm_top_cv_voting.rda"))
