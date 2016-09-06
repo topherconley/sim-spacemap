@@ -25,23 +25,24 @@ tune_param_cols <- which(!(names(best_tune) %in% "dataid"))
 tune_per_dataid <- best_tune[match(dataid, best_tune$dataid),tune_param_cols]
 
 #Number of bootstraps 
-B <- 100L
+B <- 1000L
 boot <- TRUE
 seed <-  73311L
 refitRidge <- 0.0
+perc_boot <- 0.9
 
 library(spacemap)
 library(foreach)
 library(doRNG)
 
 #fit to bootstrap replicates
-tictoc <- system.time({boot_cv_fits <- spacemap::reprodEdge(Y.m = dat$Y, X.m =v dat$X, tune = tune_per_dataid, 
+tictoc <- system.time({boot_cv_fits <- spacemap::reprodEdge(Y.m = dat$Y, X.m = dat$X, tune = tune_per_dataid, 
                               boot = boot, B = B, seed = seed, 
-                              p0 = 1.0, iter = iter, tol = tol, cd_iter = cd_iter, 
+                              p0 = perc_boot, iter = iter, tol = tol, cd_iter = cd_iter, 
                               refitRidge = refitRidge)})
-saveRDS(boot_cv_fits, file = file.path(res_path, paste0("boot_replicates_dataid_", sprintf("%03d", dataid), ".rds")))
-saveRDS(tictoc[3], file = file.path(res_path, paste0("boot_time_dataid_", sprintf("%03d", dataid), ".rds")))
-save.image(file = file.path(res_path, paste0("boot_dataid_", sprintf("%03d", dataid), ".rda")))
+saveRDS(boot_cv_fits, file = file.path(res_path, paste0("ninety_perc_", "boot_replicates_dataid_", sprintf("%03d", dataid), ".rds")))
+saveRDS(tictoc[3], file = file.path(res_path, paste0("ninety_perc_", "boot_time_dataid_", sprintf("%03d", dataid), ".rds")))
+save.image(file = file.path(res_path, paste0("ninety_perc_", "boot_dataid_", sprintf("%03d", dataid), ".rda")))
 
 #Bootstrap vote
 boot_vote <- function(boot_cv_fits, vote_thresh = 0.5) {
@@ -75,6 +76,6 @@ boot_vote <- function(boot_cv_fits, vote_thresh = 0.5) {
 }
 
 bvSpmap <- boot_vote(boot_cv_fits)
-saveRDS(bvSpmap, file = file.path(res_path, paste0("boot_vote_dataid_", sprintf("%03d", dataid), ".rds")))
+saveRDS(bvSpmap, file = file.path(res_path, paste0("ninety_perc_", "boot_vote_dataid_", sprintf("%03d", dataid), ".rds")))
 
 stopCluster(cl)
