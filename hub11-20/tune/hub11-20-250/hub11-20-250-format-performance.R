@@ -2,12 +2,25 @@ setwd("~/scratch-data/sim-spacemap/hub11-20/2016/results/n250/")
 voted <- readRDS("spacemap/spacemap_top_cv_voting_performance.rds")
 
 files <- c("spacemap/spacemap_top_cv_voting_performance.rds", 
+           "spacemap/spacemap_ninety_perc_boot_vote_performance.rds",
            "space/space_top_cv_voting_performance.rds", 
            "scggm/scggm_top_cv_voting_performance.rds")
+
+simple_xhub_files <-  c("spacemap/simple_xhub_spacemap_top_cv_voting_performance.rds", 
+                        "spacemap/simple_xhub_ninety_perc_spacemap_top_cv_voting_performance.rds",
+                        "space/simple_xhub_space_top_cv_voting_performance.rds", 
+                        "scggm/simple_xhub_scggm_top_cv_voting_performance.rds")
+
+sub_xhub_files <-  c("spacemap/xhub_spacemap_top_cv_voting_performance.rds",
+                     "spacemap/xhub_ninety_perc_spacemap_top_cv_voting_performance.rds",
+                     "space/xhub_space_top_cv_voting_performance.rds", 
+                     "scggm/xhub_scggm_top_cv_voting_performance.rds")
 
 library(data.table)
 library(foreach)
 #Tables
+
+#Original Table
 res <- foreach(f = files, .combine = 'rbind') %do% { 
   voted <- readRDS(f)
   xbarv <- voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
@@ -16,17 +29,51 @@ res <- foreach(f = files, .combine = 'rbind') %do% {
   sd <- c(sdv$sd_mcc[1], sdv$sd_power[2:3], sdv$sd_fdr[2:3])
   fmt <- paste0(signif(power, 4), " (", signif(sd, 2), ")")
 }
-res2 <- foreach(f = files) %do% { 
-  voted <- readRDS(f)
-  xbarv <- voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
-  sdv <- voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
-  list(xbar = xbarv, sd = sdv)
-}
+# res2 <- foreach(f = files) %do% { 
+#   voted <- readRDS(f)
+#   xbarv <- voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
+#   sdv <- voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
+#   list(xbar = xbarv, sd = sdv)
+# }
 
 colnames(res) <- c("MCC","YY Power", "XY Power", "YY FDR", "XY FDR")
-rownames(res) <- c("Spacemap", "SPACE", "sCGGM")
+rownames(res) <- c("Spacemap.CV", "Spacemap.Boot", "SPACE", "sCGGM")
 library(xtable)
 print(xtable(res), include.rownames = T)
+
+
+#Simple X hub FDR version 
+simple_xhub_res <- foreach(f = simple_xhub_files, .combine = 'rbind') %do% { 
+  voted <- readRDS(f)
+  xbarv <- voted[,list(mean_power = mean(power), mean_fdr = mean(fdr))]
+  sdv <- voted[,list(sd_power = sd(power), sd_fdr = sd(fdr))]
+  fmt <- paste0(signif(xbarv, 4), " (", signif(sdv, 2), ")")
+}
+
+colnames(simple_xhub_res) <- c("X-hub Power", "X-hub FDR")
+rownames(simple_xhub_res) <- c("Spacemap", "SPACE", "sCGGM")
+
+simple_res_final <- cbind(res, simple_xhub_res)
+simple_res_final <- simple_res_final[,c(1,2,3,6,4,5,7)]
+library(xtable)
+print(xtable(simple_res_final), include.rownames = T)
+
+#Sub X hub FDR version 
+sub_xhub_res <- foreach(f = sub_xhub_files, .combine = 'rbind') %do% { 
+  voted <- readRDS(f)
+  xbarv <- voted[,list(mean_power = mean(power), mean_fdr = mean(fdr))]
+  sdv <- voted[,list(sd_power = sd(power), sd_fdr = sd(fdr))]
+  fmt <- paste0(signif(xbarv, 4), " (", signif(sdv, 2), ")")
+}
+
+colnames(sub_xhub_res) <- c("X-hub Power", "X-hub FDR")
+rownames(sub_xhub_res) <- c("Spacemap", "SPACE", "sCGGM")
+
+sub_res_final <- cbind(res, sub_xhub_res)
+sub_res_final <- sub_res_final[,c(1,2,3,4,5,7)]
+library(xtable)
+print(xtable(sub_res_final), include.rownames = T)
+
 
 #Comparisons
 library(ggplot2)

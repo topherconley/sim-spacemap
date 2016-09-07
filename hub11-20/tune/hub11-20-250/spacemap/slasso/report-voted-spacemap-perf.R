@@ -19,8 +19,55 @@ library(data.table)
 voted <- rbindlist(voted_spacemap_perf)
 setkey(voted, comparison)
 voted["(yy,xy)",]
-voted[,list(median_mcc = median(mcc), median_power = median(power), median_fdr = median(fdr)),by = comparison]
+voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr)),by = comparison]
 voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
 saveRDS(voted, file = file.path(basedir, "spacemap_top_cv_voting_performance.rds"))
 save.image(file = file.path(basedir, "spacemap_top_cv_voting.rda"))
 
+#  XY  Power and FDR calculation with just X hubs (ignoring non-x hubs)
+
+xhub_voted_spacemap_perf <- foreach(bhf = best_holdout_files, .packages = "spacemap") %do% { 
+  bhf <- sub(pattern = "/home/cconley/", replacement = "~/", x = bhf)
+  fit <- cvVoteRDS(mod_lambda = bhf, tol = 1e-6, major_thresh = 0.5, method = "spacemap")
+  xhub_index <- which(rowSums(abs(truth$xy) > tol) > 0)
+  xhub_fit <- fit
+  xhub_fit$xy <- fit$xy[xhub_index,]
+  xhub_truth <- truth
+  xhub_truth$xy <- xhub_truth$xy[xhub_index,]
+  formatPerf(fit = xhub_fit, truth = xhub_truth, tol = tol)[3,]
+} 
+
+xhub_voted <- rbindlist(xhub_voted_spacemap_perf)
+xhub_voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr))]
+xhub_voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = comparison]
+basedir <- sub("/home/cconley/", "~/", basedir)
+saveRDS(xhub_voted, file = file.path(basedir, "xhub_spacemap_top_cv_voting_performance.rds"))
+save.image(file = file.path(basedir, "xhub_spacemap_top_cv_voting.rda"))
+
+
+#  X Hub  Power and FDR calculation 
+#true positive  = X  with at least one true edge and allows for some false positives
+#false positive = X with all false positive edges
+#fale negative = X with no predicted edges but indeed is a X hub
+
+simple_xhub_spacemap_perf <- foreach(bhf = best_holdout_files, .packages = "spacemap") %do% { 
+  bhf <- sub(pattern = "/home/cconley/", replacement = "~/", x = bhf)
+  fit <- cvVoteRDS(mod_lambda = bhf, tol = 1e-6, major_thresh = 0.5, method = "spacemap")
+  xh  <- which(rowSums(abs(truth$xy) > tol) > 0)
+  nxh <- which(rowSums(abs(truth$xy) > tol) == 0)
+  pxh <- which(rowSums(abs(fit$xy) > tol) > 0)
+  pnxh <- which(rowSums(abs(fit$xy) > tol) == 0)
+  tp <- length(intersect(pxh, xh))
+  fp <- length(setdiff(pxh, xh))
+  fn <- length(setdiff(xh, pxh))
+  tn <- length(intersect(pnxh, nxh))
+  stopifnot(sum(c(tp,fp,fn,tn)) == nrow(fit$xy))
+  data.frame(power = algoPower(tp, fn), fdr = algoFDR(tp, fp), mcc = algoMCC(tp, fn, fp, tn))
+} 
+
+library(data.table)
+simple_xhub_voted <- rbindlist(simple_xhub_spacemap_perf)
+simple_xhub_voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr))]
+basedir <- sub("/home/cconley/", "~/", basedir)
+saveRDS(simple_xhub_voted, file = file.path(basedir, "simple_xhub_spacemap_top_cv_voting_performance.rds"))
+save.image(file = file.path(basedir, "simple_xhub_spacemap_top_cv_voting.rda"))
