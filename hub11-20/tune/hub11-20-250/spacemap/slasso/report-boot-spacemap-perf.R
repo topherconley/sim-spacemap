@@ -6,7 +6,7 @@ dat <- readRDS(paste0("~/scratch-data/sim-spacemap/hub11-20/2016/datasets/n250/h
 truth <- dat$trueParCor
 library(foreach)
 library(spacemap)
-dataids <- seq_len(6)
+dataids <- seq_len(100)
 lbp <- foreach(dataid = dataids) %do% { 
   res_path <- paste0("~/scratch-data/sim-spacemap/hub11-20/2016/results/n250/spacemap/boot-spacemap/d", sprintf("%03d", dataid))
   bvSpmap <- readRDS(file = file.path(res_path, paste0("ninety_perc_boot_vote_dataid_", sprintf("%03d", dataid), ".rds")))
