@@ -37,9 +37,9 @@ res <- foreach(f = files, .combine = 'rbind') %do% {
 # }
 
 colnames(res) <- c("MCC","YY Power", "XY Power", "YY FDR", "XY FDR")
-rownames(res) <- c("Spacemap.CV", "Spacemap.Boot", "SPACE", "sCGGM")
-library(xtable)
-print(xtable(res), include.rownames = T)
+rownames(res) <- c("Spacemap.CV", "Spacemap.Boot", "SPACE.CV", "sCGGM.CV")
+# library(xtable)
+# print(xtable(res), include.rownames = T)
 
 
 #Simple X hub FDR version 
@@ -51,7 +51,7 @@ simple_xhub_res <- foreach(f = simple_xhub_files, .combine = 'rbind') %do% {
 }
 
 colnames(simple_xhub_res) <- c("X-hub Power", "X-hub FDR")
-rownames(simple_xhub_res) <- c("Spacemap", "SPACE", "sCGGM")
+rownames(simple_xhub_res) <- rownames(res)
 
 simple_res_final <- cbind(res, simple_xhub_res)
 simple_res_final <- simple_res_final[,c(1,2,3,6,4,5,7)]
