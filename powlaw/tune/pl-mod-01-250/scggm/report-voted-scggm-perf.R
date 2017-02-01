@@ -31,3 +31,31 @@ voted[,list(sd_mcc = sd(mcc), sd_power = sd(power), sd_fdr = sd(fdr)),by = compa
 saveRDS(voted, file = file.path(basedir, "scggm_top_cv_voting_performance.rds"))
 save.image(file = file.path(basedir, "scggm_top_cv_voting.rda"))
 
+#  X Hub  Power and FDR calculation 
+#true positive  = X  with at least one true edge and allows for some false positives
+#false positive = X with all false positive edges
+#fale negative = X with no predicted edges but indeed is a X hub
+
+simple_xhub_scggm_perf <- foreach(bhf = best_holdout_files, .packages = "spacemap") %do% {
+  bhf <- sub(pattern = "/home/cconley/", replacement = "~/", x = bhf)
+  fit <- cvVoteRDS(mod_lambda = bhf, tol = 1e-6, major_thresh = 0.5, method = "scggm")
+  xh  <- which(rowSums(abs(truth$xy) > tol) > 0)
+  nxh <- which(rowSums(abs(truth$xy) > tol) == 0)
+  pxh <- which(rowSums(abs(fit$xy) > tol) > 0)
+  pnxh <- which(rowSums(abs(fit$xy) > tol) == 0)
+  tp <- length(intersect(pxh, xh))
+  fp <- length(setdiff(pxh, xh))
+  fn <- length(setdiff(xh, pxh))
+  tn <- length(intersect(pnxh, nxh))
+  stopifnot(sum(c(tp,fp,fn,tn)) == nrow(fit$xy))
+  data.frame(power = algoPower(tp, fn), fdr = algoFDR(tp, fp), mcc = algoMCC(tp, fn, fp, tn))
+}
+
+library(data.table)
+simple_xhub_voted <- rbindlist(simple_xhub_scggm_perf)
+simple_xhub_voted[,list(mean_mcc = mean(mcc), mean_power = mean(power), mean_fdr = mean(fdr))]
+basedir <- sub("/home/cconley/", "~/", basedir)
+saveRDS(simple_xhub_voted, file = file.path(basedir, "simple_xhub_scggm_top_cv_voting_performance.rds"))
+save.image(file = file.path(basedir, "simple_xhub_scggm_top_cv_voting.rda"))
+
+
